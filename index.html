@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Fin de Mois</title>
+<meta name="description" content="Estimation du solde du compte courant en fin de mois">
+<meta name="theme-color" content="#141d33">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fin de Mois">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="upd" id="upd" hidden><span>Nouvelle version disponible</span><button class="btn small" id="upd-go">Mettre à jour</button></div>
+<div class="wrap" id="app"></div>
+<nav class="tabs" id="tabs"></nav>
+<div id="sheet"></div>
+<div class="toast" id="toast" hidden></div>
+<script>window.APP_VERSION='1.0.0';</script>
+<script src="app.js"></script>
+</body>
+</html>
