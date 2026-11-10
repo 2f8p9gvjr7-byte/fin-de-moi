@@ -27,6 +27,7 @@ function examples(){
       {id:uid(),lib:'Assurance habitation',montant:210,jour:10,freq:'trimestriel',debut:1}],
     ponct:[
       {id:uid(),lib:'Fioul chauffage',montant:1100,date:iso(new Date(y,m,t.getDate()+8))},
+      {id:uid(),lib:'Virement depuis le livret',montant:600,sens:'entree',date:iso(new Date(y,m,t.getDate()+7))},
       {id:uid(),lib:'Don association',montant:150,date:at(1,10)},
       {id:uid(),lib:'Cotisation annuelle club',montant:60,date:at(3,1)},
       {id:uid(),lib:'Taxe foncière',montant:980,date:iso(new Date(y+(m>=9?1:0),9,15))}],
@@ -50,7 +51,7 @@ function occ(y,m){
   const out=[],nd=dim(y,m);
   for(const r of S.recettes) if(matchFreq(r,m)) out.push({key:'r:'+r.id+':'+y+'-'+m,kind:'Recette',lib:r.lib,amt:+r.montant,day:Math.min(r.jour,nd),ref:['recettes',r.id]});
   for(const f of S.fixes) if(matchFreq(f,m)) out.push({key:'f:'+f.id+':'+y+'-'+m,kind:'Prélèvement',lib:f.lib,amt:-f.montant,day:Math.min(f.jour,nd),ref:['fixes',f.id]});
-  for(const p of S.ponct){const d=parse(p.date);if(d.getFullYear()===y&&d.getMonth()===m) out.push({key:'p:'+p.id,kind:'Ponctuelle',lib:p.lib,amt:-p.montant,day:d.getDate(),ref:['ponct',p.id]})}
+  for(const p of S.ponct){const d=parse(p.date);if(d.getFullYear()===y&&d.getMonth()===m) out.push({key:'p:'+p.id,kind:p.sens==='entree'?'Entrée ponctuelle':'Dépense ponctuelle',lib:p.lib,amt:p.sens==='entree'?+p.montant:-p.montant,day:d.getDate(),ref:['ponct',p.id]})}
   for(const c of S.cartes){const [a,hab]=cardAmt(c,y,m);out.push({key:'c:'+c.id+':'+y+'-'+m,kind:'Débit carte différé',lib:c.nom,amt:-a,day:Math.min(c.jour,nd),ref:['cartes',c.id],est:hab})}
   return out;
 }
@@ -153,12 +154,12 @@ function vPonct(){
   const s=sd(),start=new Date(s.getFullYear(),s.getMonth(),1);
   const all=[...S.ponct].sort((a,b)=>a.date<b.date?-1:1);
   const fut=all.filter(p=>parse(p.date)>=start),past=all.filter(p=>parse(p.date)<start);
-  const row=p=>{const d=parse(p.date);return `<button class="row" data-edit="ponct" data-id="${p.id}"><div class="d num">${dd(d.getDate(),d.getMonth())}<br><span style="font-weight:500">${d.getFullYear()}</span></div><div class="t"><b>${esc(p.lib)}</b><span>${MOIS[d.getMonth()]} ${d.getFullYear()}</span></div><div class="a num neg">−${E(p.montant)}</div></button>`};
-  return `<div class="top"><h1>Dépenses ponctuelles</h1></div>
+  const row=p=>{const d=parse(p.date);return `<button class="row" data-edit="ponct" data-id="${p.id}"><div class="d num">${dd(d.getDate(),d.getMonth())}<br><span style="font-weight:500">${d.getFullYear()}</span></div><div class="t"><b>${esc(p.lib)}</b><span>${MOIS[d.getMonth()]} ${d.getFullYear()}</span></div><div class="a num ${p.sens==='entree'?'pos':'neg'}">${p.sens==='entree'?'+':'−'}${E(p.montant)}</div></button>`};
+  return `<div class="top"><h1>Opérations ponctuelles</h1></div>
   <div class="card"><div class="sechead"><h2>À prévoir</h2><button class="btn small" data-add="ponct">Ajouter</button></div>
-  ${fut.length?`<div class="list">${fut.map(row).join('')}</div>`:'<div class="empty">Aucune dépense prévue.</div>'}
+  ${fut.length?`<div class="list">${fut.map(row).join('')}</div>`:'<div class="empty">Aucune opération prévue.</div>'}
   ${past.length?`<details><summary>Mois passés (${past.length})</summary><div class="list">${past.map(row).join('')}</div></details>`:''}</div>
-  <p class="muted" style="font-size:.9rem;margin:0">Fioul, taxe foncière, dons, cotisations… Mets la date de paiement prévue : la dépense apparaît dans le bon mois.</p>`;
+  <p class="muted" style="font-size:.9rem;margin:0">Dépenses (fioul, taxe foncière, dons, cotisations…) ou entrées exceptionnelles (virement d'un autre compte, remboursement, prime…). Mets la date prévue : l'opération apparaît dans le bon mois. Les retraites et autres revenus réguliers se saisissent dans l'onglet Fixes.</p>`;
 }
 function vCartes(){
   return `<div class="top"><h1>Cartes à débit différé</h1></div>
@@ -199,7 +200,7 @@ function render(){
 let sheetCtx=null,confirmDel=false;
 function openSheet(kind,id){
   const arr=S[kind],it=id?arr.find(x=>x.id===id):null;sheetCtx={kind,id};confirmDel=false;
-  const t={recettes:'Recette',fixes:'Prélèvement',ponct:'Dépense ponctuelle',cartes:'Carte'}[kind];
+  const t={recettes:'Recette',fixes:'Prélèvement',ponct:'Opération ponctuelle',cartes:'Carte'}[kind];
   const val=(k,d='')=>it?esc(String(it[k]).replace(/^(\d+)\.(\d+)$/,'$1,$2')):d;
   let f='';
   if(kind==='cartes'){
@@ -207,9 +208,11 @@ function openSheet(kind,id){
      <label class="f">Jour du débit<input id="s-jour" inputmode="numeric" value="${val('jour','20')}"></label>
      <label class="f">Débit habituel (€)<input id="s-est" inputmode="decimal" value="${val('estim','0')}"></label></div>`;
   }else if(kind==='ponct'){
-    f=`<label class="f">Libellé<input id="s-lib" value="${val('lib','')}"></label><div class="fields">
+    const sens=it?(it.sens||'sortie'):'sortie';
+    f=`<label class="f">Type<select id="s-sens"><option value="sortie" ${sens==='sortie'?'selected':''}>Dépense (sort du compte)</option><option value="entree" ${sens==='entree'?'selected':''}>Entrée (virement, remboursement…)</option></select></label>
+     <label class="f">Libellé<input id="s-lib" value="${val('lib','')}"></label><div class="fields">
      <label class="f">Montant (€)<input id="s-mt" inputmode="decimal" value="${val('montant','')}"></label>
-     <label class="f">Date de paiement prévue<input id="s-date" type="date" value="${it?it.date:iso(new Date())}"></label></div>`;
+     <label class="f">Date prévue<input id="s-date" type="date" value="${it?it.date:iso(new Date())}"></label></div>`;
   }else{
     const fq=it?it.freq:'mensuel',db0=it?it.debut||1:sd().getMonth()+1;
     f=`<label class="f">Libellé<input id="s-lib" value="${val('lib','')}"></label><div class="fields">
@@ -229,7 +232,7 @@ function sheetSave(){
   const lib=g('s-lib').value.trim()||'Sans nom';let o;
   const jour=Math.min(31,Math.max(1,parseInt(g('s-jour')?.value)||1));
   if(kind==='cartes')o={nom:lib,jour,estim:num(g('s-est').value)};
-  else if(kind==='ponct')o={lib,montant:Math.abs(num(g('s-mt').value)),date:g('s-date').value||iso(new Date())};
+  else if(kind==='ponct')o={lib,sens:g('s-sens').value,montant:Math.abs(num(g('s-mt').value)),date:g('s-date').value||iso(new Date())};
   else o={lib,montant:Math.abs(num(g('s-mt').value)),jour,freq:g('s-freq').value,debut:+g('s-deb').value||1};
   if(id)Object.assign(S[kind].find(x=>x.id===id),o);else S[kind].push({id:uid(),...o});
   save();closeSheet();render();toast('Enregistré');
