@@ -120,6 +120,23 @@ function curve(r,s){
    <text x="${L}" y="${H-5}">${dd(d0,m)}</text><text x="${W-R}" y="${H-5}" text-anchor="end">${dd(nd,m)}</text></svg>`;
 }
 
+function detail(r,y,m,nd){
+  const s=sd(),G=[
+    ['Recettes',o=>o.amt>0,'pos'],
+    ['Prélèvements',o=>o.kind==='Prélèvement','neg'],
+    ['Dépenses ponctuelles',o=>o.kind==='Dépense ponctuelle','neg'],
+    ['Cartes (débit différé)',o=>o.kind==='Débit carte différé','neg']];
+  let h=`<tr class="tot"><td>Solde au ${dd(s.getDate(),s.getMonth())}</td><td></td><td><b>${E(+S.solde||0)}</b></td></tr>`;
+  for(const [lab,f,cl] of G){
+    const ops=r.up.filter(f);if(!ops.length)continue;
+    const sum=ops.reduce((a,o)=>a+o.amt,0);
+    h+=`<tr class="grp"><td colspan="2">${lab}</td><td class="${cl}"><b>${sum>0?'+':''}${E(sum)}</b></td></tr>`;
+    h+=ops.map(o=>`<tr class="ln"><td>${esc(o.lib)}${o.est?' <span class="muted">(habituel)</span>':''}</td><td class="muted">${dd(o.day,m)}</td><td class="${cl}">${o.amt>0?'+':''}${E(o.amt)}</td></tr>`).join('');
+  }
+  h+=`<tr class="tot fin"><td>Solde estimé au ${dd(nd,m)}</td><td></td><td class="${r.end<0?'neg':''}"><b>${E(r.end)}</b></td></tr>`;
+  return `<div class="card" style="padding-inline:10px"><h2 style="padding-inline:4px">D'où vient ce solde</h2><div style="overflow-x:auto"><table class="tbl calc num"><tbody>${h}</tbody></table></div>
+  <div class="muted" style="font-size:.82rem;padding-inline:4px">Seules les opérations pas encore passées sont comptées : les autres sont déjà dans le solde de départ.</div></div>`;
+}
 function vMois(){
   const s=sd(),y=s.getFullYear(),m=s.getMonth(),r=simulate(y,m,+S.solde||0),nd=dim(y,m);
   const bad=r.min<0;
@@ -128,6 +145,7 @@ function vMois(){
   <div class="hero ${r.end<0?'bad':''}"><div class="lbl">Solde estimé au ${nd} ${MOIS[m]}</div><div class="big num">${E(r.end)}</div>
    <div class="sub num"><span class="p">+${E(r.inc)} à recevoir</span><span class="n">−${E(r.out)} à payer</span></div>
    ${r.minDay?`<div><span class="chip num">${bad?'⚠ ':''}Point bas ${E(r.min)} le ${dd(r.minDay,m)}</span></div>`:''}</div>
+  ${detail(r,y,m,nd)}
   <div class="card"><h2>Mon compte courant</h2><div class="fields">
    <label class="f">Solde lu sur la banque<input id="in-solde" class="num" inputmode="decimal" value="${String(S.solde).replace('.',',')}"></label>
    <label class="f">À la date du<input id="in-date" type="date" value="${S.soldeDate}"></label></div>

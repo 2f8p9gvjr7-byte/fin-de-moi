@@ -79,3 +79,11 @@ textarea{font:inherit;font-size:.85rem;width:100%;min-height:110px;border:1px so
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(30px);opacity:.6}}}
 .upd{position:fixed;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));top:calc(10px + env(safe-area-inset-top,0px));z-index:30;background:var(--surface2);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
 .ver{text-align:center;font-family:var(--mono);font-size:.75rem;color:var(--muted)}
+.tbl.calc td{text-align:right}
+.tbl.calc td:first-child{text-align:left;overflow-wrap:anywhere}
+.tbl.calc td:nth-child(2){font-size:.8rem;white-space:nowrap}
+.tbl.calc tr.grp td{padding-top:14px;font-family:var(--body);font-weight:700;color:var(--accent);font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;border-top:1px solid var(--line2)}
+.tbl.calc tr.ln td{border-top:0;padding:5px 4px;font-size:.88rem}
+.tbl.calc tr.tot td{font-weight:700;border-top:1px solid var(--line2);padding-block:10px}
+.tbl.calc tr.tot:first-child td{border-top:0}
+.tbl.calc tr.fin td{border-top:2px solid var(--accent);font-size:1rem}
