@@ -97,33 +97,10 @@ function rowHTML(o,y,m,opts={}){
   <div class="a num"><div class="${o.amt<0?'neg':'pos'}">${o.amt>0?'+':''}${E(o.amt)}</div>${o.after!==undefined&&!o.passed?`<span>reste ${E(o.after)}</span>`:''}${tg}</div></div>`;
 }
 
-function curve(r,s){
-  const y=s.getFullYear(),m=s.getMonth(),nd=dim(y,m),d0=s.getDate();
-  const pts=[];let bal=+S.solde||0;
-  for(let d=d0;d<=nd;d++){for(const o of r.up)if(o.day===d)bal+=o.amt;pts.push([d,bal])}
-  if(pts.length<2)return '';
-  const W=340,H=150,L=8,R=8,T=18,B=22;
-  const vs=pts.map(p=>p[1]).concat([0]);let lo=Math.min(...vs),hi=Math.max(...vs);if(hi===lo)hi=lo+1;
-  const pad=(hi-lo)*.08;lo-=pad;hi+=pad;
-  const X=d=>L+(d-d0)/(nd-d0||1)*(W-L-R),Yv=v=>T+(hi-v)/(hi-lo)*(H-T-B);
-  let path=`M${X(pts[0][0])},${Yv(pts[0][1])}`;
-  for(let i=1;i<pts.length;i++)path+=` H${X(pts[i][0])} V${Yv(pts[i][1])}`;
-  const area=path+` V${Yv(lo)} H${X(pts[0][0])} Z`;
-  const mn=pts.reduce((a,b)=>b[1]<a[1]?b:a);
-  const mx=X(mn[0]),my=Yv(mn[1]);const anchor=mx>W*0.7?'end':mx<W*0.3?'start':'middle';
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Évolution du solde jusqu'à la fin du mois">
-   <path d="${area}" fill="var(--accent-soft)" stroke="none"/>
-   ${lo<0?`<line x1="${L}" x2="${W-R}" y1="${Yv(0)}" y2="${Yv(0)}" stroke="var(--neg)" stroke-dasharray="4 4" stroke-width="1"/>`:''}
-   <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2"/>
-   <circle cx="${mx}" cy="${my}" r="4" fill="${mn[1]<0?'var(--neg)':'var(--accent)'}"/>
-   <text x="${mx}" y="${Math.max(12,my-8)}" text-anchor="${anchor}" style="font-weight:700;fill:${mn[1]<0?'var(--neg)':'var(--fg)'}">${E(mn[1])}</text>
-   <text x="${L}" y="${H-5}">${dd(d0,m)}</text><text x="${W-R}" y="${H-5}" text-anchor="end">${dd(nd,m)}</text></svg>`;
-}
-
 function detail(r,y,m,nd){
   const s=sd(),G=[
     ['Recettes',o=>o.amt>0,'pos'],
-    ['Prélèvements',o=>o.kind==='Prélèvement','neg'],
+    ['Dépenses mensuelles',o=>o.kind==='Prélèvement','neg'],
     ['Dépenses ponctuelles',o=>o.kind==='Dépense ponctuelle','neg'],
     ['Cartes (débit différé)',o=>o.kind==='Débit carte différé','neg']];
   let h=`<tr class="tot"><td>Solde au ${dd(s.getDate(),s.getMonth())}</td><td></td><td><b>${E(+S.solde||0)}</b></td></tr>`;
@@ -144,15 +121,15 @@ function vMois(){
   <div class="top"><h1>${MOIS[m][0].toUpperCase()+MOIS[m].slice(1)} ${y}</h1><small>${r.up.length} opération${r.up.length>1?'s':''} à venir</small></div>
   <div class="hero ${r.end<0?'bad':''}"><div class="lbl">Solde estimé au ${nd} ${MOIS[m]}</div><div class="big num">${E(r.end)}</div>
    <div class="sub num"><span class="p">+${E(r.inc)} à recevoir</span><span class="n">−${E(r.out)} à payer</span></div>
-   ${r.minDay?`<div><span class="chip num">${bad?'⚠ ':''}Point bas ${E(r.min)} le ${dd(r.minDay,m)}</span></div>`:''}</div>
+   ${r.minDay&&r.min<r.end?`<div><span class="chip num">${bad?'⚠ ':''}Point bas ${E(r.min)} le ${dd(r.minDay,m)}</span></div>`:''}</div>
   ${detail(r,y,m,nd)}
+  <div class="card"><div class="sechead"><h2>Totaux de ${MOIS[m]}</h2><span class="muted" style="font-size:.85rem">mois complet</span></div><div class="kvs">${lines(totals(r.all))}</div></div>
   <div class="card"><h2>Mon compte courant</h2><div class="fields">
    <label class="f">Solde lu sur la banque<input id="in-solde" class="num" inputmode="decimal" value="${String(S.solde).replace('.',',')}"></label>
    <label class="f">À la date du<input id="in-date" type="date" value="${S.soldeDate}"></label></div>
    ${S.soldeDate!==iso(new Date())?`<button class="btn small ghost" data-act="today" style="align-self:flex-start">Mettre la date d'aujourd'hui</button>`:''}</div>
   ${S.cartes.length?`<div class="card"><div class="sechead"><h2>Débits cartes de ${MOIS[m]}</h2><span class="muted" style="font-size:.85rem">montant estimé</span></div><div class="fields">
    ${S.cartes.map(c=>{const day=Math.min(c.jour,nd),[a]=cardAmt(c,y,m),pas=isPassed({key:'c:'+c.id+':'+y+'-'+m,day},y,m);return `<label class="f">${esc(c.nom)} · ${pas?'débitée le':'débit le'} ${dd(day,m)}<input class="num" inputmode="decimal" data-cest="${c.id}" value="${String(a).replace('.',',')}" ${pas?'disabled':''}></label>`}).join('')}</div></div>`:''}
-  <div class="card"><h2>Jusqu'à la fin du mois</h2>${curve(r,s)||'<div class="empty">Plus aucun jour à afficher ce mois-ci.</div>'}</div>
   <div class="card"><h2>À venir ce mois</h2><div class="list">${r.up.length?r.up.map(o=>rowHTML(o,y,m,{toggle:true})).join(''):'<div class="empty">Rien d\'autre ne doit passer ce mois-ci.</div>'}</div>
   ${r.done.length?`<details><summary>Déjà dans le solde (${r.done.length})</summary><div class="list">${r.done.map(o=>rowHTML(o,y,m,{toggle:true})).join('')}</div></details>`:''}</div>`;
 }
@@ -172,11 +149,15 @@ function vPonct(){
   const s=sd(),start=new Date(s.getFullYear(),s.getMonth(),1);
   const all=[...S.ponct].sort((a,b)=>a.date<b.date?-1:1);
   const fut=all.filter(p=>parse(p.date)>=start),past=all.filter(p=>parse(p.date)<start);
-  const row=p=>{const d=parse(p.date);return `<button class="row" data-edit="ponct" data-id="${p.id}"><div class="d num">${dd(d.getDate(),d.getMonth())}<br><span style="font-weight:500">${d.getFullYear()}</span></div><div class="t"><b>${esc(p.lib)}</b><span>${MOIS[d.getMonth()]} ${d.getFullYear()}</span></div><div class="a num ${p.sens==='entree'?'pos':'neg'}">${p.sens==='entree'?'+':'−'}${E(p.montant)}</div></button>`};
+  const row=p=>{const d=parse(p.date);return `<button class="row" data-edit="ponct" data-id="${p.id}"><div class="d num">${dd(d.getDate(),d.getMonth())}</div><div class="t"><b>${esc(p.lib)}</b><span>${p.sens==='entree'?'Entrée':'Dépense'}</span></div><div class="a num ${p.sens==='entree'?'pos':'neg'}">${p.sens==='entree'?'+':'−'}${E(p.montant)}</div></button>`};
+  const groups=list=>{const g=[];for(const p of list){const d=parse(p.date),k=d.getFullYear()*12+d.getMonth();let G=g.find(x=>x.k===k);if(!G){G={k,y:d.getFullYear(),m:d.getMonth(),items:[]};g.push(G)}G.items.push(p)}return g};
+  const block=G=>{const dep=G.items.filter(p=>p.sens!=='entree').reduce((a,p)=>a+p.montant,0),ent=G.items.filter(p=>p.sens==='entree').reduce((a,p)=>a+p.montant,0);
+    return `<div class="pg"><div class="pgh"><span>${MOIS[G.m]} ${G.y}</span><span class="num">${dep?`<b class="neg">−${E(dep)}</b>`:''}${ent?` <b class="pos">+${E(ent)}</b>`:''}</span></div><div class="list">${G.items.map(row).join('')}</div></div>`};
+  const fg=groups(fut),totDep=fut.filter(p=>p.sens!=='entree').reduce((a,p)=>a+p.montant,0);
   return `<div class="top"><h1>Opérations ponctuelles</h1></div>
-  <div class="card"><div class="sechead"><h2>À prévoir</h2><button class="btn small" data-add="ponct">Ajouter</button></div>
-  ${fut.length?`<div class="list">${fut.map(row).join('')}</div>`:'<div class="empty">Aucune opération prévue.</div>'}
-  ${past.length?`<details><summary>Mois passés (${past.length})</summary><div class="list">${past.map(row).join('')}</div></details>`:''}</div>
+  <div class="card"><div class="sechead"><div><h2>À prévoir</h2>${totDep?`<span class="muted num" style="font-size:.85rem">${E(totDep)} de dépenses prévues</span>`:''}</div><button class="btn small" data-add="ponct">Ajouter</button></div>
+  ${fg.length?fg.map(block).join(''):'<div class="empty">Aucune opération prévue.</div>'}
+  ${past.length?`<details><summary>Mois passés (${past.length})</summary>${groups(past).reverse().map(block).join('')}</details>`:''}</div>
   <p class="muted" style="font-size:.9rem;margin:0">Dépenses (fioul, taxe foncière, dons, cotisations…) ou entrées exceptionnelles (virement d'un autre compte, remboursement, prime…). Mets la date prévue : l'opération apparaît dans le bon mois. Les retraites et autres revenus réguliers se saisissent dans l'onglet Fixes.</p>`;
 }
 function vCartes(){
@@ -188,25 +169,49 @@ function vCartes(){
   <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small ghost" data-act="export">Copier la sauvegarde</button><button class="btn small ghost" data-act="import">Restaurer</button><button class="btn small danger" data-act="wipe">Tout vider</button></div>
   <div id="io"></div></div><div class="ver">Fin de Mois · version ${window.APP_VERSION||''}</div>`;
 }
-function bars(rows){
-  const W=340,H=170,L=6,R=6,T=16,B=22,n=rows.length,bw=(W-L-R)/n;
-  const vs=rows.map(r=>r.end).concat(rows.map(r=>r.min),[0]);let lo=Math.min(...vs),hi=Math.max(...vs);if(hi===lo)hi=lo+1;
-  const Y=v=>T+(hi-v)/(hi-lo)*(H-T-B),z=Y(0);
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Solde estimé en fin de chaque mois">
-  ${rows.map((r,i)=>{const x=L+i*bw+bw*.18,w=bw*.64,yv=Y(r.end);return `<rect x="${x}" y="${Math.min(yv,z)}" width="${w}" height="${Math.max(1,Math.abs(z-yv))}" rx="2" fill="${r.end<0?'var(--neg)':'var(--accent)'}"/>${r.min<0&&r.end>=0?`<circle cx="${x+w/2}" cy="${Y(r.min)}" r="3" fill="var(--neg)"/>`:''}<text x="${x+w/2}" y="${H-6}" text-anchor="middle">${MCOURT[r.m]}</text>`}).join('')}
-  <line x1="${L}" x2="${W-R}" y1="${z}" y2="${z}" stroke="var(--muted)" stroke-width="1"/></svg>`;
+function totals(list){
+  const t={rec:0,fix:0,pon:0,car:0,entPon:0};
+  for(const o of list){
+    if(o.kind==='Recette')t.rec+=o.amt;
+    else if(o.kind==='Entrée ponctuelle')t.entPon+=o.amt;
+    else if(o.kind==='Prélèvement')t.fix-=o.amt;
+    else if(o.kind==='Dépense ponctuelle')t.pon-=o.amt;
+    else t.car-=o.amt;
+  }
+  t.entrees=t.rec+t.entPon;t.sorties=t.fix+t.pon+t.car;t.net=t.entrees-t.sorties;
+  return t;
 }
-let openMonth=null;
+const cut=n=>eur.format(Math.round(n)).replace(/,00\s?€/,'\u00a0€');
+function lines(t){
+  const L=[['Recettes régulières',t.rec,'pos'],['Entrées ponctuelles',t.entPon,'pos'],['Dépenses mensuelles',-t.fix,'neg'],['Dépenses ponctuelles',-t.pon,'neg'],['Cartes (débit différé)',-t.car,'neg']];
+  return L.filter(([l,v],i)=>v!==0||i===0||i===2||i===3).map(([l,v,c])=>`<div class="kv"><span>${l}</span><span class="num ${v?c:'muted'}">${v>0?'+':v<0?'−':''}${E(Math.abs(v))}</span></div>`).join('');
+}
+let openMonth=0;
 function vAnnee(){
   const rows=year(),low=rows.reduce((a,b)=>b.min<a.min?b:a);
+  const T=totals(rows.flatMap(r=>r.all));
+  const kinds=['Recette','Entrée ponctuelle','Prélèvement','Dépense ponctuelle','Débit carte différé'];
   return `<div class="top"><h1>Les 12 prochains mois</h1></div>
-  <div class="card"><div class="sechead"><h2>Solde en fin de mois</h2></div>${bars(rows)}
-  <div class="muted" style="font-size:.88rem">Mois le plus tendu : <b class="${low.min<0?'neg':''}">${MOIS[low.m]} ${low.y}</b>, point bas ${E(low.min)}${low.minDay?' le '+dd(low.minDay,low.m):''}.</div></div>
-  <div class="card" style="padding-inline:10px"><div style="overflow-x:auto"><table class="tbl num"><thead><tr><th>Mois</th><th>Entrées</th><th>Sorties</th><th>Fin de mois</th></tr></thead><tbody>
-  ${rows.map((r,i)=>`<tr class="m" data-month="${i}"><td><b>${MCOURT[r.m]}</b> ${String(r.y).slice(2)} ${openMonth===i?'▴':'▾'}</td><td class="pos">+${E(r.inc)}</td><td class="neg">−${E(r.out)}</td><td class="${r.end<0?'neg':''}"><b>${E(r.end)}</b></td></tr>
-  ${openMonth===i?`<tr class="det"><td colspan="4">${r.up.length?r.up.map(o=>`${dd(o.day,r.m)} · ${esc(o.lib)} <span class="${o.amt<0?'neg':'pos'}">${E(o.amt)}</span>${o.est?' (estim.)':''}`).join('<br>'):'Rien de prévu.'}</td></tr>`:''}`).join('')}
-  </tbody></table></div></div>
-  <p class="muted" style="font-size:.9rem;margin:0">Le mois en cours part de ton solde réel ; les suivants enchaînent sur l'estimation précédente, avec le montant habituel des cartes.</p>`;
+  <div class="card"><h2>Sur 12 mois</h2>
+   <div class="tiles">
+    <div class="tile"><span>Dépenses mensuelles</span><b class="num">${cut(T.fix)}</b><small class="num">≈ ${cut(T.fix/12)} / mois</small></div>
+    <div class="tile"><span>Dépenses ponctuelles</span><b class="num">${cut(T.pon)}</b><small class="num">≈ ${cut(T.pon/12)} / mois</small></div>
+    <div class="tile"><span>Cartes</span><b class="num">${cut(T.car)}</b><small class="num">≈ ${cut(T.car/12)} / mois</small></div>
+    <div class="tile"><span>Recettes</span><b class="num pos">${cut(T.entrees)}</b><small class="num">≈ ${cut(T.entrees/12)} / mois</small></div>
+   </div>
+   <div class="muted" style="font-size:.88rem">Mois le plus tendu : <b class="${low.min<0?'neg':''}">${MOIS[low.m]} ${low.y}</b>, point bas ${E(low.min)}${low.minDay?' le '+dd(low.minDay,low.m):''}.</div></div>
+  ${rows.map((r,i)=>{const t=totals(r.all),open=openMonth===i;
+   return `<div class="card mcard"><button class="mhead" data-month="${i}" aria-expanded="${open}">
+     <span class="mt">${MOIS[r.m]} ${r.y}${i===0?' <small>mois en cours</small>':''}</span>
+     <span class="me num ${r.end<0?'neg':''}">${E(r.end)}<small>fin de mois</small></span></button>
+    <div class="kvs">${lines(t)}
+     <div class="kv sum"><span>Solde du mois</span><span class="num ${t.net<0?'neg':'pos'}">${t.net>0?'+':t.net<0?'−':''}${E(Math.abs(t.net))}</span></div>
+     ${r.min<0?`<div class="kv"><span class="neg">Point bas le ${dd(r.minDay,r.m)}</span><span class="num neg">${E(r.min)}</span></div>`:''}</div>
+    ${open?`<div class="mdet">${kinds.map(k=>{const ops=r.all.filter(o=>o.kind===k).sort((a,b)=>a.day-b.day);if(!ops.length)return '';
+      return `<div class="kind">${({'Recette':'Recettes régulières','Entrée ponctuelle':'Entrées ponctuelles','Prélèvement':'Dépenses mensuelles','Dépense ponctuelle':'Dépenses ponctuelles','Débit carte différé':'Cartes'})[k]}</div>`+ops.map(o=>`<div class="kv sm ${o.passed?'done':''}"><span>${dd(o.day,r.m)} · ${esc(o.lib)}${o.est?' <i class="muted">(habituel)</i>':''}${o.passed?' <i class="muted">(passé)</i>':''}</span><span class="num ${o.amt<0?'neg':'pos'}">${o.amt>0?'+':''}${E(o.amt)}</span></div>`).join('')}).join('')}</div>`
+    :`<button class="more" data-month="${i}">Voir le détail ▾</button>`}
+   </div>`}).join('')}
+  <p class="muted" style="font-size:.9rem;margin:0">Les totaux portent sur le mois complet. Le solde de fin du mois en cours part de ton solde réel ; les mois suivants enchaînent, avec le montant habituel des cartes.</p>`;
 }
 function render(){
   renderTabs();
