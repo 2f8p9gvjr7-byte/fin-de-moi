@@ -55,6 +55,13 @@ function occ(y,m){
   for(const c of S.cartes){const [a,hab]=cardAmt(c,y,m);out.push({key:'c:'+c.id+':'+y+'-'+m,kind:'Débit carte différé',lib:c.nom,amt:-a,day:Math.min(c.jour,nd),ref:['cartes',c.id],est:hab})}
   return out;
 }
+/* Nouveau relevé : les opérations dont la date est passée sont dans le solde,
+   les anciennes coches manuelles sur ces jours n'ont plus lieu d'être. */
+function setDate(v){
+  const d=parse(v),y=d.getFullYear(),m=d.getMonth();
+  for(const k of Object.keys(S.over)){const o=occ(y,m).find(x=>x.key===k);if(!o||o.day<=d.getDate())delete S.over[k]}
+  S.soldeDate=v;save();render();
+}
 function isPassed(o,y,m){
   const s=sd();if(y*12+m<s.getFullYear()*12+s.getMonth())return true;
   if(y!==s.getFullYear()||m!==s.getMonth())return false;
@@ -93,7 +100,7 @@ function renderTabs(){document.getElementById('tabs').innerHTML=TABS.map(([k,l])
 function rowHTML(o,y,m,opts={}){
   const tg=opts.toggle?`<button class="tog" data-tog="${o.key}">${o.passed?'Remettre à venir':'Déjà passé'}</button>`:'';
   return `<div class="row ${o.passed?'done':''}"><div class="d num">${dd(o.day,m)}</div>
-  <div class="t"><b>${esc(o.lib)}</b><span>${o.kind}${o.est?' · estimation':''}</span></div>
+  <div class="t"><b>${esc(o.lib)}</b><span>${o.kind}${o.est?' · estimation':''}${S.over[o.key]==='passe'?' · <b class="man">coché « déjà passé »</b>':''}${S.over[o.key]==='avenir'?' · <b class="man">remis à venir</b>':''}</span></div>
   <div class="a num"><div class="${o.amt<0?'neg':'pos'}">${o.amt>0?'+':''}${E(o.amt)}</div>${o.after!==undefined&&!o.passed?`<span>reste ${E(o.after)}</span>`:''}${tg}</div></div>`;
 }
 
@@ -284,7 +291,7 @@ document.addEventListener('click',e=>{
     const {kind,id}=sheetCtx;S[kind]=S[kind].filter(x=>x.id!==id);save();closeSheet();render();toast('Supprimé');return}
   const a=b.dataset.act;
   if(a==='keep'){S.exemple=false;save();render()}
-  if(a==='today'){S.soldeDate=iso(new Date());save();render()}
+  if(a==='today'){setDate(iso(new Date()))}
   if(a==='wipe'){if(b.dataset.c!=='1'){b.dataset.c='1';b.textContent='Confirmer : tout effacer';return}S=blank();save();render();toast('Tout est vidé')}
   if(a==='export'){const txt=JSON.stringify(S);const io=document.getElementById('io');
     io.innerHTML=`<textarea id="io-t" readonly>${esc(txt)}</textarea><div class="muted" style="font-size:.85rem">Garde ce texte dans une note : il permet de tout restaurer.</div>`;
@@ -297,7 +304,7 @@ document.addEventListener('input',e=>{if(e.target.id==='s-mois')e.target.dataset
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='in-solde'){S.solde=num(t.value);save();render()}
-  else if(t.id==='in-date'&&t.value){S.soldeDate=t.value;save();render()}
+  else if(t.id==='in-date'&&t.value){setDate(t.value)}
   else if(t.dataset.cest&&!t.disabled){const c=S.cartes.find(x=>x.id===t.dataset.cest);if(c){const s0=sd();S.cest=S.cest||{};S.cest[cKey(c,s0.getFullYear(),s0.getMonth())]=num(t.value);save();render()}}
 });
 document.addEventListener('keydown',e=>{

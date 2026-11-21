@@ -113,3 +113,4 @@ textarea{font:inherit;font-size:.85rem;width:100%;min-height:110px;border:1px so
 .pg+.pg{margin-top:6px}
 .pgh{display:flex;justify-content:space-between;gap:10px;padding:8px 0 2px;border-bottom:1px solid var(--accent-line);font-weight:800;text-transform:capitalize;font-size:.92rem}
 .pgh .num{text-transform:none}
+.row .t span b.man{display:inline;color:var(--accent);font-weight:700;font-size:inherit}
