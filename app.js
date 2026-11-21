@@ -163,8 +163,8 @@ function vPonct(){
 function vCartes(){
   return `<div class="top"><h1>Cartes à débit différé</h1></div>
   <div class="card"><div class="sechead"><h2>Mes cartes</h2><button class="btn small" data-add="cartes">Ajouter</button></div>
-  ${S.cartes.length?`<div class="list">${S.cartes.map(c=>`<button class="row" data-edit="cartes" data-id="${c.id}"><div class="d num">le ${c.jour}</div><div class="t"><b>${esc(c.nom)}</b><span>débit unique le ${c.jour} de chaque mois</span></div><div class="a num neg">−${E(c.estim)}<span>habituel</span></div></button>`).join('')}</div>`:'<div class="empty">Aucune carte.</div>'}</div>
-  <p class="muted" style="font-size:.9rem;margin:0">Chaque carte est débitée en une seule fois à son jour. Pour le mois en cours, tu ajustes le montant estimé dans l'onglet « Ce mois ». Le montant habituel sert pour les mois suivants.</p>
+  ${S.cartes.length?`<div class="list">${S.cartes.map(c=>`<button class="row" data-edit="cartes" data-id="${c.id}"><div class="d num">le ${c.jour}</div><div class="t"><b>${esc(c.nom)}</b><span>habituel ${E(c.estim)}</span></div><div class="a num neg">${(()=>{const s0=sd(),[a]=cardAmt(c,s0.getFullYear(),s0.getMonth());return `−${E(a)}<span>en ${MOIS[s0.getMonth()]}</span>`})()}</div></button>`).join('')}</div>`:'<div class="empty">Aucune carte.</div>'}</div>
+  <p class="muted" style="font-size:.9rem;margin:0">Chaque carte est débitée en une seule fois à son jour. Le montant du mois en cours se modifie ici (touche la carte) ou dans l'onglet « Ce mois » : c'est lui qui compte dans le solde. Le débit habituel sert pour les mois suivants.</p>
   <div class="card"><h2>Sauvegarde</h2><p class="muted" style="margin:0;font-size:.92rem">Tes données restent uniquement sur ce téléphone, dans l'appli. Garde de temps en temps une copie texte dans une note : elle sert à tout restaurer ou à passer sur un autre appareil.</p>
   <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small ghost" data-act="export">Copier la sauvegarde</button><button class="btn small ghost" data-act="import">Restaurer</button><button class="btn small danger" data-act="wipe">Tout vider</button></div>
   <div id="io"></div></div><div class="ver">Fin de Mois · version ${window.APP_VERSION||''}</div>`;
@@ -229,7 +229,10 @@ function openSheet(kind,id){
   if(kind==='cartes'){
     f=`<label class="f">Nom<input id="s-lib" value="${val('nom','')}"></label><div class="fields">
      <label class="f">Jour du débit<input id="s-jour" inputmode="numeric" value="${val('jour','20')}"></label>
-     <label class="f">Débit habituel (€)<input id="s-est" inputmode="decimal" value="${val('estim','0')}"></label></div>`;
+     <label class="f">Débit habituel (€)<input id="s-est" inputmode="decimal" value="${val('estim','0')}"></label></div>
+     ${it?(()=>{const s0=sd(),y0=s0.getFullYear(),m0=s0.getMonth(),[a,hab]=cardAmt(it,y0,m0),pas=isPassed({key:'c:'+it.id+':'+y0+'-'+m0,day:Math.min(it.jour,dim(y0,m0))},y0,m0);
+       return `<label class="f">Débit ${pas?'passé le '+dd(Math.min(it.jour,dim(y0,m0)),m0):'prévu en '+MOIS[m0]} (€)<input id="s-mois" inputmode="decimal" value="${String(a).replace('.',',')}" data-hab="${hab?1:0}" ${pas?'disabled':''}></label>
+       <div class="muted" style="font-size:.82rem">C'est ce montant qui compte dans le solde de ${MOIS[m0]}. Le débit habituel sert pour les mois suivants.</div>`})():''}`;
   }else if(kind==='ponct'){
     const sens=it?(it.sens||'sortie'):'sortie';
     f=`<label class="f">Type<select id="s-sens"><option value="sortie" ${sens==='sortie'?'selected':''}>Dépense (sort du compte)</option><option value="entree" ${sens==='entree'?'selected':''}>Entrée (virement, remboursement…)</option></select></label>
@@ -254,7 +257,12 @@ function sheetSave(){
   const {kind,id}=sheetCtx,g=i=>document.getElementById(i);
   const lib=g('s-lib').value.trim()||'Sans nom';let o;
   const jour=Math.min(31,Math.max(1,parseInt(g('s-jour')?.value)||1));
-  if(kind==='cartes')o={nom:lib,jour,estim:num(g('s-est').value)};
+  if(kind==='cartes'){o={nom:lib,jour,estim:num(g('s-est').value)};
+    const mf=g('s-mois');
+    if(mf&&id){const s0=sd(),k=cKey({id},s0.getFullYear(),s0.getMonth());S.cest=S.cest||{};
+      if(mf.dataset.touched==='1'){const v=num(mf.value);if(v===o.estim)delete S.cest[k];else S.cest[k]=v}
+      else if(mf.dataset.hab!=='1'&&num(mf.value)===o.estim)delete S.cest[k];}
+  }
   else if(kind==='ponct')o={lib,sens:g('s-sens').value,montant:Math.abs(num(g('s-mt').value)),date:g('s-date').value||iso(new Date())};
   else o={lib,montant:Math.abs(num(g('s-mt').value)),jour,freq:g('s-freq').value,debut:+g('s-deb').value||1};
   if(id)Object.assign(S[kind].find(x=>x.id===id),o);else S[kind].push({id:uid(),...o});
@@ -285,11 +293,12 @@ document.addEventListener('click',e=>{
   if(a==='import'){document.getElementById('io').innerHTML=`<textarea id="io-t" placeholder="Colle ici le texte de sauvegarde"></textarea><button class="btn small" data-act="doimport" style="align-self:flex-start">Restaurer ces données</button>`}
   if(a==='doimport'){try{const d=JSON.parse(document.getElementById('io-t').value);if(!Array.isArray(d.fixes))throw 0;S=Object.assign(blank(),d);save();render();toast('Données restaurées')}catch(x){toast("Ce texte n'est pas une sauvegarde valide")}}
 });
+document.addEventListener('input',e=>{if(e.target.id==='s-mois')e.target.dataset.touched='1'});
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='in-solde'){S.solde=num(t.value);save();render()}
   else if(t.id==='in-date'&&t.value){S.soldeDate=t.value;save();render()}
-  else if(t.dataset.cest){const c=S.cartes.find(x=>x.id===t.dataset.cest);if(c){const s0=sd();S.cest=S.cest||{};S.cest[cKey(c,s0.getFullYear(),s0.getMonth())]=num(t.value);save();render()}}
+  else if(t.dataset.cest&&!t.disabled){const c=S.cartes.find(x=>x.id===t.dataset.cest);if(c){const s0=sd();S.cest=S.cest||{};S.cest[cKey(c,s0.getFullYear(),s0.getMonth())]=num(t.value);save();render()}}
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&sheetCtx)closeSheet();
